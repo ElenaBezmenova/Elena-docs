@@ -1,0 +1,725 @@
+---
+title: "Blackwell_Brand Preference Prediction"
+author: "Elena Bezmenova"
+date: "2024-01-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# DATA IMPORT
+
+Call the readr library
+
+```{r include=TRUE}
+library(readr)
+```
+
+Uploading the training dataset and creating a training data frame
+
+```{r include=TRUE}
+CompleteResponses<- read.csv(file="CompleteResponses.csv", 
+                             header=TRUE, sep=",")
+```
+
+# EXPLORATORY DATA ANALYSIS
+
+## General Data Exploratory
+
+Print the min, max, mean, median, and quartiles of each attribute
+
+```{r include=TRUE}
+summary(CompleteResponses)
+```
+
+*There are no missing values in this data frame.*
+
+Display the structure of the data set
+
+```{r include=TRUE}
+str(CompleteResponses)
+```
+
+*The training data set is composed of 7 columns and 9898 entries.*
+*The training data set has 2 types of data:*
+
+*The variables "brend", elevel", "car", "zipcode" are categorical although*
+*they have numerical values (integers).*
+
+Name the attributes within the data set
+
+```{r include=TRUE}
+names(CompleteResponses)
+```
+
+## Plots
+
+Salary Histogram Plot
+
+```{r include=TRUE}
+hist(CompleteResponses$salary)
+```
+
+*The customer`s salary fluctuate between 20k and 150k USD.*
+
+Salary Box Plot
+
+```{r include=TRUE}
+boxplot(CompleteResponses$salary,
+        main = "Salary distribution",
+        ylab = "Salary",
+        col = "lightblue",
+        border = "black")
+```
+
+*The salary appear to be mostly between 52k and 117k USD.*
+
+Age Histogram Plot
+
+```{r include=TRUE}
+hist(CompleteResponses$age)
+```
+
+*The Blackwell clients are 20-80 years old.*
+
+Age Box Plot
+
+```{r include=TRUE}
+boxplot(CompleteResponses$age,
+        main = "Age distribution",
+        ylab = "Age",
+        col = "orange",
+        border = "blue")
+```
+
+*Most of the customers are between the ages of 35 and 65.*
+
+Education level Histogram Plot
+
+```{r include=TRUE}
+hist(CompleteResponses$elevel)
+```
+
+*There is almost the same distribution of clients by level of education.*
+
+Car Histogram Plot
+
+```{r include=TRUE}
+hist(CompleteResponses$car)
+```
+
+*There are more than two times customers who prefer BMW(1) as primary car than other car brands.*
+
+Zip code Histogram Plot
+
+```{r include=TRUE}
+hist(CompleteResponses$zipcode)
+```
+
+Credit Histogram Plot
+
+```{r include=TRUE}
+hist(CompleteResponses$credit)
+```
+
+*The max available credit amount is 500k USD.*
+
+Credit Box Plot
+
+```{r include=TRUE}
+boxplot(CompleteResponses$credit,
+        main = "Credit distribution",
+        ylab = "Credit",
+        col = "yellow",
+        border = "red")
+```
+
+*The credit amount appear to be mostly between 120k and 375k USD.*
+
+Computer Brend Histogram Plot
+
+```{r include=TRUE}
+hist(CompleteResponses$brand)
+```
+
+*Most of the customers prefer the computer brand Sony (1).*
+
+## Scatter Plots
+
+Distribution of age in computer brends
+
+```{r include=TRUE}
+plot(CompleteResponses$brand,CompleteResponses$age)
+```
+
+Distribution of salary in computer brends
+
+```{r include=TRUE}
+plot(CompleteResponses$brand,CompleteResponses$salary)
+```
+
+Distribution of salary and age in each computer brend
+
+```{r include=TRUE}
+library(ggplot2)
+ggplot(CompleteResponses, aes(x = age, y = salary, color = brand)) +
+  geom_point() +
+  labs(title = "Distribution of Salary and Age in each computer brend",
+       x = "Age",
+       y = "Salary",
+       color = "Brand")
+```
+
+*From the figure above, one may conclude that all of the clients who have salary of more than 130k USD prefer the brand Sony.*
+*The clients between the ages of 20 and 40 with a salary up to 50k USD or more than 100k USD also prefer this brand.*
+*The brand Sony is chosen by the customers of the age group from 60 to 80 years old if their salary is more than 80k USD.*
+*The clients between the ages of 40 and 60 prefer the brand Sony in case they have a salary up to 80k USD or more than 130k USD.*
+
+# PREPROCESSING
+
+Convert column 'brand' to a factor data type
+
+```{r include=TRUE}
+CompleteResponses$brand <- as.factor(CompleteResponses$brand)
+class(CompleteResponses$brand)
+```
+
+Convert the columns 'elevel', 'car' and 'zipcode' to a factor data type
+
+```{r include=TRUE}
+CompleteResponses$elevel <- as.factor(CompleteResponses$elevel)
+CompleteResponses$car <- as.factor(CompleteResponses$car)
+CompleteResponses$zipcode <- as.factor(CompleteResponses$zipcode)
+```
+
+Check class of all columns
+
+```{r include=TRUE}
+str(CompleteResponses)
+```
+
+Transform the variables "elevel" and "car" in variables dummies for a accurate result
+
+```{r include=TRUE}
+elevel_dummies <- as.data.frame(model.matrix(~ elevel - 1, data = CompleteResponses))
+CompleteResponses <- cbind(CompleteResponses, elevel_dummies)
+car_dummies <- as.data.frame(model.matrix(~ car - 1, data = CompleteResponses))
+CompleteResponses <- cbind(CompleteResponses, car_dummies)
+str(CompleteResponses)
+```
+
+Delete "elevel" y "car" columns to avoid duplication
+
+```{r include=TRUE}
+CompleteResponses <- subset(CompleteResponses, select = -c(elevel, car))
+str(CompleteResponses)
+```
+
+# MODELING
+
+Call the caret library
+
+```{r include=TRUE}
+library(caret)
+```
+
+Choose a sequence of random numbers
+
+```{r include=TRUE}
+set.seed(123)
+```
+
+Define an 75%/25% train/test split of the data set
+
+```{r include=TRUE}
+inTrain <- createDataPartition(CompleteResponses$brand, p = .75, list = FALSE)
+```
+
+Show a set of integers for the rows of CompleteResponses that belong in the training set
+
+```{r include=TRUE}
+str(inTrain)
+```
+
+Create the training and testing sets
+
+```{r include=TRUE}
+training <- CompleteResponses[inTrain,]
+testing <- CompleteResponses[-inTrain,]
+nrow(training)
+nrow(testing)
+```
+
+Check class proportions 
+
+```{r include=TRUE}
+table(training$brand)
+```
+
+Call the ROSE library
+
+```{r include=TRUE}
+library(ROSE)
+```
+
+Resampling and checking again class proportions
+
+```{r include=TRUE}
+oversampled_training <- ovun.sample(brand ~ ., data = training, 
+                                    method = "over", seed = 123)
+table(oversampled_training$data$brand)
+```
+
+The resampling method: 10 fold cross validation repeat 1 time
+
+```{r include=TRUE}
+fitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 1)
+```
+
+## RANDOM FOREST CLASSIFIER
+
+### Automatic tuning
+
+Train Random Forest model (Automatic Grid) with a tuneLenght = 1 (trains with 1 mtry value)
+
+```{r include=TRUE}
+mdlRf_auto <- train(brand~., data = training, method = "rf", trControl=fitControl,
+               tuneLength = 1, verbose = 0)
+```
+
+Random Forest model training results
+
+```{r include=TRUE}
+mdlRf_auto
+```
+
+Predict new samples
+
+```{r include=TRUE}
+prds_auto <- predict(mdlRf_auto, newdata = testing)
+str(prds_auto)
+```
+
+Compute the Confusion Matrix
+
+```{r include=TRUE}
+confusionMatrix(data = prds_auto, testing$brand)
+```
+
+### Manual tuning
+
+Data frame for manual tuning of mtry
+
+```{r include=TRUE}
+rfGrid <- expand.grid(mtry=c(7,8,9))
+```
+
+Train Random Forest model with manual tuning
+
+```{r include=TRUE}
+mdlRf <- train(brand~., data = oversampled_training$data, method = "rf", trControl=fitControl,tuneGrid = rfGrid, verbose = 0)
+```
+
+Get the best hyperparameters
+
+```{r include=TRUE}
+best_mtry <- mdlRf$bestTune$mtry
+print(best_mtry)
+```
+
+Random Forest model training results
+
+```{r include=TRUE}
+mdlRf
+```
+
+Predict new samples
+
+```{r include=TRUE}
+prds <- predict(mdlRf, newdata = testing)
+str(prds)
+```
+
+Compute the Confusion Matrix
+
+```{r include=TRUE}
+confusionMatrix(data = prds, testing$brand)
+```
+
+## C5.0 CLASSIFIER
+
+### Automatic tuning
+
+Call the C5.0 library
+
+```{r include=TRUE}
+library(C50)
+```
+
+Train C5.0 model using our training data
+
+```{r include=TRUE}
+mdl5<- train(brand~., data = training, method="C5.0",trControl=fitControl,
+             tuneLength = 1, verbose = 0)
+```
+
+C5.0 model training results
+
+```{r include=TRUE}
+mdl5
+```
+
+Predict new samples
+
+```{r include=TRUE}
+prdsC5 <- predict(mdl5, newdata = testing)
+str(prdsC5)
+```
+
+Compute the Confusion Matrix
+
+```{r include=TRUE}
+confusionMatrix(data = prdsC5, testing$brand)
+```
+
+### Manual tuning
+
+Define a grid of hyperparameter values for C5.0
+
+```{r include=TRUE}
+c50Grid <- expand.grid(trials = c(5,9,10), model = c("tree", "rules"),
+                       winnow = c(TRUE, FALSE))
+```
+
+Train C5.0 model with manual tuning
+
+```{r include=TRUE}
+mdlC50 <- train(brand ~ ., data = oversampled_training$data, method = "C5.0", trControl = fitControl,tuneGrid = c50Grid, verbose = 0)
+```
+
+Get the best hyperparameters
+
+```{r include=TRUE}
+best_trials <- mdlC50$bestTune$trials
+best_model <- mdlC50$bestTune$model
+best_winnow <- mdlC50$bestTune$winnow
+print(best_trials)
+print(best_model)
+print(best_winnow)
+```
+
+C5.0 model training results
+
+```{r include=TRUE}
+mdlC50
+```
+
+Predict new samples
+
+```{r include=TRUE}
+prdsC50 <- predict(mdlC50, newdata = testing)
+str(prdsC50)
+```
+
+Compute the Confusion Matrix
+
+```{r include=TRUE}
+confusionMatrix(data = prdsC50, testing$brand)
+```
+
+## GRADIENT BOOSTING CLASSIFIER
+
+### Automatic tuning
+
+Call the gbm library
+
+```{r include=TRUE}
+library(gbm3)
+```
+
+Train Gradient Boosting model using our training data
+
+```{r include=TRUE}
+mdlGbm<- train(brand~., data = training, method="gbm",trControl=fitControl,
+               tuneLength = 1,verbose = 0)
+```
+
+Gradient Boosting model training results
+
+```{r include=TRUE}
+mdlGbm
+```
+
+Predict new samples
+
+```{r include=TRUE}
+predsGB <- predict(mdlGbm, newdata = testing)
+str(predsGB)
+```
+
+Compute the Confusion Matrix
+
+```{r include=TRUE}
+confusionMatrix(data = predsGB, testing$brand)
+```
+
+### Manual tuning
+
+Define a grid of hyperparameter values for GB model
+
+```{r include=TRUE}
+gbmGrid <- expand.grid(interaction.depth = c(1, 5, 9), n.trees = c(50, 100, 150),
+                       shrinkage = c(0.01, 0.1, 0.2), n.minobsinnode = c(5, 10, 15))
+```
+
+Train GB model with manual tuning
+
+```{r include=TRUE}
+mdlGbm_manual <- train(brand ~ ., data = oversampled_training$data, method = "gbm", trControl = fitControl,
+                tuneGrid = gbmGrid, verbose = 0)
+```
+
+Get the best hyperparameters
+
+```{r include=TRUE}
+best_depth <- mdlGbm$bestTune$interaction.depth
+best_ntrees <- mdlGbm$bestTune$n.trees
+best_shrinkage <- mdlGbm$bestTune$shrinkage
+best_minobsinnode <- mdlGbm$bestTune$n.minobsinnode
+print(best_depth)
+print(best_ntrees)
+print(best_shrinkage)
+print(best_minobsinnode)
+```
+
+Gradient Boosting model training results
+
+```{r include=TRUE}
+mdlGbm_manual
+```
+
+Predict new samples
+
+```{r include=TRUE}
+predsGB_manual <- predict(mdlGbm_manual, newdata = testing)
+str(predsGB_manual)
+```
+
+Compute the Confusion Matrix
+
+```{r include=TRUE}
+confusionMatrix(data = predsGB_manual, testing$brand)
+```
+
+## BEST MODEL SELECTING
+
+Compare the 3 models
+
+```{r include=TRUE}
+resamps <- resamples(list(rf = mdlRf, c5 = mdlC50, gb = mdlGbm_manual))
+summary(resamps)
+```
+
+Calculates model's performance
+
+```{r include=TRUE}
+postResample(prds,testing$brand)
+postResample(prdsC50,testing$brand)
+postResample(predsGB_manual,testing$brand)
+```
+
+Call the gbm library
+
+```{r include=TRUE}
+library(ggplot2)
+```
+
+Model´s accuracy
+
+```{r include=TRUE}
+result_prds <- postResample(prds, testing$brand)
+accuracy_prds <- result_prds[["Accuracy"]]
+result_prdsC50<- postResample(prdsC50,testing$brand)
+accuracy_prdsC50 <- result_prdsC50[["Accuracy"]]
+result_predsGB_manual <- postResample(predsGB_manual,testing$brand)
+accuracy_predsGB_manual <- result_predsGB_manual[["Accuracy"]]
+```
+
+Create a dataframe with the data
+
+```{r include=TRUE}
+data <- data.frame(Models = c("RF", "C5.0", "GB"),
+  Accuracy = c(accuracy_prds, accuracy_prdsC50, accuracy_predsGB_manual))
+```
+
+Create the accuracy bar chart
+
+```{r include=TRUE}
+ggplot(data, aes(x = Models, y = Accuracy, fill = Models)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = sprintf("%.4f", Accuracy)), vjust = -0.5, 
+            color = "red", size = 3) +
+  labs(title = "Model's accuracy",
+       x = "Models",
+       y = "Accuracy") +
+  theme_minimal() +
+  ylim(0, 1.0)
+```
+
+Model´s kappa
+
+```{r include=TRUE}
+kappa_prds <- result_prds[["Kappa"]]
+kappa_prdsC50 <- result_prdsC50[["Kappa"]]
+kappa_predsGB_manual <- result_predsGB_manual[["Kappa"]]
+```
+
+Create a dataframe with the data
+
+```{r include=TRUE}
+data_kappa <- data.frame(Models = c("RF", "C5.0", "GB"),
+  Kappa = c(kappa_prds, kappa_prdsC50, kappa_predsGB_manual))
+```
+
+Create the kappa bar chart
+
+```{r include=TRUE}
+ggplot(data_kappa, aes(x = Models, y = Kappa, fill = Models)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = sprintf("%.4f", Kappa)), vjust = -0.5, 
+            color = "blue", size = 3) +
+  labs(title = "Model's kappa",
+       x = "Models",
+       y = "Kappa") +
+  theme_minimal() +
+  ylim(0, 1.0)
+```
+
+*As shown in the figures above, the three models have almost the same accuracy and the same kappa. In this case we will use the simplest model, it is the Random Forest model.*
+
+## MODEL APPLICATION
+
+### Test data import and preprocessing
+
+Upload the test data set and creating a data frame
+
+```{r include=TRUE}
+SurveyIncomplete<- read.csv(file="SurveyIncomplete.csv", header=TRUE, sep=",")
+```
+
+Print the min, max, mean, median, and quartiles of each attribute
+
+```{r include=TRUE}
+summary(SurveyIncomplete)
+```
+
+*There are no missing values in this data frame.*
+
+Display the structure of the testing data frame
+
+```{r include=TRUE}
+str(SurveyIncomplete)
+```
+
+*The test data set is composed of 7 columns and 5000 entries.*
+
+Name the attributes within the testing data frame
+
+```{r include=TRUE}
+names(SurveyIncomplete)
+```
+
+Remove column 'brand'
+
+```{r include=TRUE}
+new_SurveyIncomplete <- subset(SurveyIncomplete, select = -c(brand))
+```
+
+Convert the columns 'elevel', 'car' and 'zipcode' to factor
+
+```{r include=TRUE}
+new_SurveyIncomplete$elevel <- as.factor(new_SurveyIncomplete$elevel)
+new_SurveyIncomplete$car <- as.factor(new_SurveyIncomplete$car)
+new_SurveyIncomplete$zipcode <- as.factor(new_SurveyIncomplete$zipcode)
+```
+
+Check class of all columns
+
+```{r include=TRUE}
+str(new_SurveyIncomplete)
+```
+
+Transform the variables "elevel" and "car" in variables dummies for a accurate result
+
+```{r include=TRUE}
+elevel_dummies <- as.data.frame(model.matrix(~ elevel - 1, data = new_SurveyIncomplete))
+new_SurveyIncomplete <- cbind(new_SurveyIncomplete, elevel_dummies)
+car_dummies <- as.data.frame(model.matrix(~ car - 1, data = new_SurveyIncomplete))
+new_SurveyIncomplete <- cbind(new_SurveyIncomplete, car_dummies)
+str(new_SurveyIncomplete)
+```
+
+Delete "elevel" y "car" columns to avoid duplication
+
+```{r include=TRUE}
+new_SurveyIncomplete <- subset(new_SurveyIncomplete, select = -c(elevel, car))
+str(new_SurveyIncomplete)
+```
+
+### Best model application
+
+Predict brend 
+
+```{r include=TRUE}
+prdsBrend <- predict(mdlRf, newdata = new_SurveyIncomplete)
+str(prdsBrend)
+```
+
+Add a new column with brend predictions
+
+```{r include=TRUE}
+new_SurveyIncomplete <-cbind(new_SurveyIncomplete,as.numeric(as.character(prdsBrend)))
+```
+
+Check all columns
+
+```{r include=TRUE}
+str(new_SurveyIncomplete)
+```
+
+Rename the predictions column
+
+```{r include=TRUE}
+colnames(new_SurveyIncomplete)[colnames(new_SurveyIncomplete) == 
+                                 "as.numeric(as.character(prdsBrend))"] <-
+  "brend_predictions"
+str(new_SurveyIncomplete)
+```
+Histogram Plot of Brend Predictions
+
+```{r include=TRUE}
+hist(new_SurveyIncomplete$brend_predictions)
+```
+
+Brand preferences predictions
+
+```{r include=TRUE}
+ggplot(new_SurveyIncomplete, aes(x = age, y = salary, color = brend_predictions)) +
+  geom_point() +
+  labs(title = "Brand preferences predictions",
+       x = "Age",
+       y = "Salary",
+       color = "Brand_predictions")
+
+ggplot(CompleteResponses, aes(x = age, y = salary, color = brand)) +
+  geom_point() +
+  labs(title = "Distribution of Salary and Age in each computer brend",
+       x = "Age",
+       y = "Salary",
+       color = "Brand")
+```
+
+*On observe that the distribution of brand predictions remains the same as in validation set which indicate that our predictions are highly accurate.*
+*As shown above, most of the Blackwell customers prefer the computer brand Sony (1). So the company should pursue a deeper strategic relationship with Sony manufacturer.*  
